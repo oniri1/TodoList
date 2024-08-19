@@ -9,6 +9,6 @@ describe("Test Express App", () => {
   test("Get / return Now Testing", async () => {
     const response = await request(app).get("/api");
     expect(response.status).toBe(200);
-    expect(response.text).toBe("Now Testing");
+    expect(response.text).toBe("Now **Testing**");
   });
 });

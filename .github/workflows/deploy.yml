@@ -4,10 +4,10 @@ name: Deployment
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
-  test:
+  test_backend:
     runs-on: ubuntu-latest
 
     services:
@@ -35,6 +35,20 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Wait for mySQL to be ready
+        run: |
+          until mysqladmin ping -h "127.0.0.1" -P 3333 --silent; do
+            echo "Waiting for mySQL"
+            sleep 5
+          done
+
+      - name: Install mySQL Client
+        run: sudo apt-get install mysql-client
+
+      - name: Run mySQL commands
+        run: |
+          mysql -h "127.0.0.1" -P 3333 -u ${{ secrets.MYSQL_USER }} -p${{ secrets.MYSQL_PASSWORD }} -e "SHOW DATABASES;"
+
       - name: set env
         working-directory: ./mock-test
         run: |
@@ -53,3 +67,216 @@ jobs:
       - name: Run Test of backend
         working-directory: ./mock-test
         run: npm test
+
+  test_node:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: Add SSH key
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.EC2_KEY }}
+
+      - name: Ensure SSH directory exists
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+      - name: Add SSH known hosts
+        run: ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: test node
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
+          export NVM_DIR="$HOME/.nvm"
+          if [ -s "$NVM_DIR/nvm.sh" ]; then
+            . "$NVM_DIR/nvm.sh"
+          else 
+            echo "nvm.sh not found"
+            exit 1
+          fi
+
+          nvm -v
+          nvm use --lts
+          node -v
+          npm -v'
+
+  test_mysql:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: Add SSH key
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.EC2_KEY }}
+
+      - name: Ensure SSH directory exists
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+      - name: Add SSH known hosts
+        run: ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: check mysql
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
+          sudo service mysql status'
+
+      - name: test mysql user
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
+          mysql -u ${{ secrets.MYSQL_USER }} -p${{ secrets.MYSQL_PASSWORD }} -e "SHOW DATABASES;"'
+
+  test-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies of frontend
+        working-directory: ./todo-list
+        run: npm i
+
+      - name: Run Test of frontend
+        working-directory: ./todo-list
+        run: npm test
+
+  deploy_backend:
+    needs:
+      - test_backend
+      - test_node
+      - test_mysql
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies of frontend
+        working-directory: ./mock-test
+        run: npm i
+
+      - name: Run Test of backend
+        working-directory: ./mock-test
+        run: |
+          npm run build
+          sudo rm -rf build/**/*/*.map
+
+      - name: Add SSH key
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.EC2_KEY }}
+
+      - name: Ensure SSH directory exists
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+      - name: Add SSH known hosts
+        run: ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy Files to EC2
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
+            rm -rf /var/www/todoList
+            mkdir /var/www/todoList
+            mkdir /var/www/todoList/backend'
+          rsync -avz -e "ssh" ./mock-test/build/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/todoList/backend
+          rsync -avz -e "ssh" ./mock-test/package.json ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/todoList/backend/package.json
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
+            export NVM_DIR="$HOME/.nvm"
+            if [ -s "$NVM_DIR/nvm.sh" ]; then
+              . "$NVM_DIR/nvm.sh"
+            else 
+              echo "nvm.sh not found"
+              exit 1
+            fi
+
+            nvm use --lts
+            cd /var/www/todoList/backend
+            npm i --production
+            echo "PORT=${{ secrets.PORT }}" > .env
+            echo "MESSAGE=${{ secrets.MESSAGE }}" >> .env
+            echo "">> .env
+            echo "MYSQL_HOST=${{ secrets.MYSQL_HOST }}" >> .env
+            echo "MYSQL_USER=${{ secrets.MYSQL_USER }}" >> .env
+            echo "MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}" >> .env
+            echo "MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}" >> .env'
+
+      - name: Start Server
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
+            export NVM_DIR="$HOME/.nvm"
+            if [ -s "$NVM_DIR/nvm.sh" ]; then
+              . "$NVM_DIR/nvm.sh"
+            else 
+              echo "nvm.sh not found"
+              exit 1
+            fi
+
+            nvm use --lts
+            
+            npm install -g pm2
+            pm2 stop all
+            pm2 start /var/www/todoList/backend/index.js --name todoListServer'
+
+  deploy_frontend:
+    needs:
+      - deploy_backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies of frontend
+        working-directory: ./todo-list
+        run: npm i
+
+      - name: Run Test of frontend
+        working-directory: ./todo-list
+        run: |
+          npm run build
+          sudo rm -rf build/**/*/*.map
+
+      - name: Add SSH key
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.EC2_KEY }}
+
+      - name: Ensure SSH directory exists
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+      - name: Add SSH known hosts
+        run: ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy Files to EC2
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
+            mkdir /var/www/todoList/front'
+          rsync -avz -e "ssh" ./todo-list/build/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/todoList/front
+
+# sudo rm -rf build/**/*/*.map

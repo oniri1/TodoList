@@ -1,9 +1,10 @@
 import { config } from "dotenv";
+import path from "path";
+
+config({ path: path.join(__dirname, ".env") });
 
 import app from "./app";
 import sequelize from "./models";
-
-config();
 
 app.set("port", process.env.PORT || 3000);
 

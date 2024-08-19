@@ -1,7 +1,4 @@
 import { Sequelize } from "sequelize-typescript";
-import { config } from "dotenv";
-
-config();
 
 const sequelize = new Sequelize({
   dialect: "mysql",
