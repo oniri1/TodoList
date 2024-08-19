@@ -1,7 +1,7 @@
 import { config } from "dotenv";
 
 import app from "./app";
-import sequelize from "./models/";
+import sequelize from "./models";
 
 config();
 
