@@ -14,7 +14,7 @@ jobs:
       mysql:
         image: mysql:latest
         ports:
-          - 3333:3306
+          - 3306:3306
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_USER: ${{ secrets.MYSQL_USER }}
@@ -37,7 +37,7 @@ jobs:
 
       - name: Wait for mySQL to be ready
         run: |
-          until mysqladmin ping -h "127.0.0.1" -P 3333 --silent; do
+          until mysqladmin ping -h "127.0.0.1" --silent; do
             echo "Waiting for mySQL"
             sleep 5
           done
@@ -47,7 +47,7 @@ jobs:
 
       - name: Run mySQL commands
         run: |
-          mysql -h "127.0.0.1" -P 3333 -u ${{ secrets.MYSQL_USER }} -p${{ secrets.MYSQL_PASSWORD }} -e "SHOW DATABASES;"
+          mysql -h "127.0.0.1" -u ${{ secrets.MYSQL_USER }} -p${{ secrets.MYSQL_PASSWORD }} -e "SHOW DATABASES;"
 
       - name: set env
         working-directory: ./mock-test
@@ -233,7 +233,7 @@ jobs:
             nvm use --lts
             
             npm install -g pm2
-            pm2 stop all
+            pm2 stop 1
             pm2 start /var/www/todoList/backend/index.js --name todoListServer'
 
   deploy_frontend:
