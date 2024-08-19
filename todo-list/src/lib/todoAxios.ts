@@ -25,3 +25,23 @@ export const addTodo = async ({ title }: Todo): Promise<Todo> => {
     throw new Error("Failed to Add Todo");
   }
 };
+
+export const updateTodo = async ({ id, title, isCompleted }: Todo) => {
+  try {
+    const res = await instance.patch("/todo", { id, title, isCompleted });
+    return res;
+  } catch (error) {
+    console.log(error);
+    throw new Error("Failed to Update Todo");
+  }
+};
+
+export const deleteTodo = async ({ id }: Todo) => {
+  try {
+    const res = await instance.delete(`/todo/${id}`);
+    return res;
+  } catch (error) {
+    console.log(error);
+    throw new Error("Failed to Delete Todo");
+  }
+};

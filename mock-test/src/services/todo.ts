@@ -43,7 +43,9 @@ export const patchTodo = async ({
     const todo = await Todo.findByPk(id);
     // const todo = todoList.find((item: Todo) => item.id === id);
     if (todo === null) throw new Error("not found todo item");
-    if (title !== undefined) todo.title = title;
+    if (title !== undefined) {
+      if (title !== "") todo.title = title;
+    }
     if (isCompleted !== undefined) todo.isCompleted = isCompleted;
     await todo.save();
     return todo;

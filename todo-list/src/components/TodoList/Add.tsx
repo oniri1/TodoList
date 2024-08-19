@@ -31,9 +31,16 @@ const AddTodo = (): JSX.Element => {
   if (isError) return <div>{error.message}</div>;
 
   return (
-    <div>
-      <input type="text" value={inputValue} onChange={onChange} />
+    <div className="flex space-x-2 mb-4">
+      <input
+        type="text"
+        data-testid={"inputFirst"}
+        value={inputValue}
+        className="flex-1 px-3 py-2 border border-gray-300 rounded"
+        onChange={onChange}
+      />
       <button
+        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
         onClick={() => {
           mutate();
         }}
