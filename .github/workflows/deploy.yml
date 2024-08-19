@@ -234,8 +234,8 @@ jobs:
             
             npm install -g pm2
             pm2 stop all
-            pm2 start /var/www/todoList/backend/index.js --name todoListServer'
-            pm2 restart all
+            pm2 start /var/www/todoList/backend/index.js --name todoListServer
+            pm2 restart all'
 
   deploy_frontend:
     needs:

@@ -76,7 +76,7 @@ export const TodoUpdateElem = ({
               await client.invalidateQueries({ queryKey: ["get", "todo"] });
             }
           }}
-          className="bg-red-500 text-white px-4 py-2 rounded hover:bg-green-600"
+          className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
         >
           Delete
         </button>
