@@ -239,6 +239,7 @@ jobs:
   deploy_frontend:
     needs:
       - deploy_backend
+      - test-frontend
     runs-on: ubuntu-latest
 
     steps:
@@ -278,6 +279,12 @@ jobs:
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
             mkdir /var/www/todoList/front'
           rsync -avz -e "ssh" ./todo-list/build/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/todoList/front
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
+            mv /var/www/todoList/front/static/css/* /var/www/twoProject/static/css
+            mv /var/www/todoList/front/static/js/* /var/www/twoProject/static/js
+            rm -rf /var/www/todoList/front/static
+            mv -f /var/www/todoList/front/imgs/* /var/www/twoProject/imgs
+            rm -rf /var/www/todoList/front/imgs'
 
   restart_nginx:
     runs-on: ubuntu-latest
